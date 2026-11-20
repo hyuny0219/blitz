@@ -49,6 +49,10 @@ func start(p_mode: String, p_map: String) -> void:
 	player.add_child(pc)
 	pc.setup(player, hud, self)
 	_build_pause()
+	if OS.get_cmdline_user_args().has("--nohud"):
+		hud.visible = false
+		player.viewmodel.visible = false
+		player.viewmodel.process_mode = Node.PROCESS_MODE_DISABLED
 	# 내비게이션 맵 동기화를 한 프레임 기다린 뒤 시작
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -78,6 +82,7 @@ func _spawn_fighters() -> void:
 	for e in plist:
 		var f := Fighter.new()
 		f.name = "Fighter%d" % fighters.size()
+		f.position = Vector3(fighters.size() * 3.0 - 15.0, 40.0, 0)
 		add_child(f)
 		var is_p: bool = e.player
 		var ch: String = Game.character if is_p else chars[ci % chars.size()]
@@ -190,6 +195,11 @@ func _process(delta: float) -> void:
 			Sfx.play("go", -4.0)
 	if running:
 		round_time += delta
+	if OS.get_cmdline_user_args().has("--debugpos") and Engine.get_process_frames() % 30 == 0:
+		print("pos ", player.global_position, " floor ", player.is_on_floor(), " vel ", player.velocity)
+		for ci in player.get_slide_collision_count():
+			var col := player.get_slide_collision(ci)
+			print("  hit ", col.get_collider(), " n=", col.get_normal(), " at ", col.get_position())
 	# 리스폰 대기
 	for i in range(respawn_q.size() - 1, -1, -1):
 		respawn_q[i].t -= delta

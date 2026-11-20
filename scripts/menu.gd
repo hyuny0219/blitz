@@ -160,7 +160,7 @@ func _build_preview() -> void:
 	cm.height = 0.08
 	disc.mesh = cm
 	disc.position.y = -0.04
-	disc.material_override = Mats.color_mat(Color(1.0, 0.6, 0.15), 1.2, 0.3)
+	disc.material_override = Mats.color_mat(Color(0.95, 0.5, 0.12), 0.25, 0.3, 0.3)
 	w.add_child(disc)
 	preview_pivot = Node3D.new()
 	w.add_child(preview_pivot)

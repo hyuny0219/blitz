@@ -25,6 +25,11 @@ const SCALE := {
 	"sandstone": 0.3, "tiles": 0.33, "wood": 0.5,
 }
 
+const TINT := {
+	"concrete": Color(0.78, 0.8, 0.84), "sand": Color(0.88, 0.84, 0.78), "grass": Color(0.78, 0.86, 0.74),
+	"sandstone": Color(0.9, 0.86, 0.8), "tiles": Color(0.85, 0.85, 0.88), "metal": Color(0.9, 0.92, 0.95),
+}
+
 static var _cache := {}
 
 
@@ -41,6 +46,7 @@ static func get_mat(id: String) -> StandardMaterial3D:
 			break
 	if tex:
 		m.albedo_texture = tex
+		m.albedo_color = TINT.get(id, Color.WHITE)
 		m.uv1_triplanar = true
 		m.uv1_world_triplanar = true
 		var s: float = SCALE.get(id, 0.3)

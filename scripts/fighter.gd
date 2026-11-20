@@ -70,6 +70,9 @@ func setup(p_team: int, p_name: String, p_char: String, p_slots: Array, p_player
 	collision_mask = 1 | 2
 	floor_max_angle = deg_to_rad(50)
 	floor_snap_length = 0.4
+	platform_on_leave = CharacterBody3D.PLATFORM_ON_LEAVE_DO_NOTHING
+	platform_floor_layers = 0
+	platform_wall_layers = 0
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
 	cap.radius = 0.38

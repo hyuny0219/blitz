@@ -22,6 +22,8 @@ var is_touch: bool = false
 
 func _ready() -> void:
 	is_touch = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios")
+	if OS.get_cmdline_user_args().has("--touch"):
+		is_touch = true
 	load_save()
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.001)))
 

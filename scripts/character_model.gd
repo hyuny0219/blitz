@@ -250,44 +250,74 @@ func _build_glb(path: String) -> void:
 	if _skel:
 		for i in _skel.get_bone_count():
 			var bn := _skel.get_bone_name(i).to_lower()
-			for key in ["leftupleg", "rightupleg", "leftleg", "rightleg", "leftarm", "rightarm", "leftforearm", "rightforearm", "spine", "head", "hips"]:
+			for key in ["leftupleg", "rightupleg", "leftleg", "rightleg", "leftfoot", "rightfoot", "leftarm", "rightarm",
+					"leftforearm", "rightforearm", "lefthand", "righthand", "head", "hips"]:
 				if bn.ends_with(key) and not _bones.has(key):
 					_bones[key] = i
-					_rest[key] = _skel.get_bone_pose_rotation(i)
+		for key in _bones:
+			_rest[key] = _skel.get_bone_global_rest(_bones[key])
 	if _anim:
 		_anim.stop()
-	# 총 붙이기: 오른손 본이 있으면 거기에
 	gun_holder = Node3D.new()
-	var hand := -1
-	if _skel:
-		for i in _skel.get_bone_count():
-			if _skel.get_bone_name(i).to_lower().ends_with("righthand"):
-				hand = i
-	if hand >= 0:
-		var ba := BoneAttachment3D.new()
-		ba.bone_idx = hand
-		_skel.add_child(ba)
-		ba.add_child(gun_holder)
-		gun_holder.rotation_degrees = Vector3(0, 180, 0)
-	else:
-		gun_holder.position = Vector3(0.12, 1.36, -0.05)
-		add_child(gun_holder)
+	add_child(gun_holder)
+	gun_holder.position = Vector3(0.1, 1.3, -0.32)
+
+
+## 스켈레톤 공간(캐릭터 정면 +Z)에서 뼈를 원하는 방향으로 겨눈다. 새 전역 basis 반환
+func _aim(key: String, child: String, dir: Vector3, parent_basis: Basis) -> Basis:
+	if not _bones.has(key) or not _bones.has(child):
+		return parent_basis
+	var rg: Transform3D = _rest[key]
+	var cg: Transform3D = _rest[child]
+	var parent_rest := _parent_rest_basis(key)
+	var cur_basis := parent_basis * (parent_rest.inverse() * rg.basis)
+	var local_dir := rg.basis.inverse() * (cg.origin - rg.origin).normalized()
+	var cur_dir := (cur_basis * local_dir).normalized()
+	var q := Quaternion(cur_dir, dir.normalized())
+	var nb := Basis(q) * cur_basis
+	_skel.set_bone_pose_rotation(_bones[key], (parent_basis.inverse() * nb).get_rotation_quaternion())
+	return nb
+
+
+func _swing(key: String, angle: float, parent_basis: Basis) -> Basis:
+	if not _bones.has(key):
+		return parent_basis
+	var rg: Transform3D = _rest[key]
+	var parent_rest := _parent_rest_basis(key)
+	var cur_basis := parent_basis * (parent_rest.inverse() * rg.basis)
+	var nb := Basis(Vector3.RIGHT, angle) * cur_basis
+	_skel.set_bone_pose_rotation(_bones[key], (parent_basis.inverse() * nb).get_rotation_quaternion())
+	return nb
+
+
+func _parent_rest_basis(key: String) -> Basis:
+	var p := _skel.get_bone_parent(_bones[key])
+	if p < 0:
+		return Basis()
+	return _skel.get_bone_global_rest(p).basis
 
 
 func _animate_glb(swing: float, air: bool, pitch: float, speed: float) -> void:
-	var leg := swing
-	if air:
-		leg = 0.5
-	_rot("leftupleg", Vector3.RIGHT, -leg)
-	_rot("rightupleg", Vector3.RIGHT, leg if not air else -0.2)
-	_rot("leftleg", Vector3.RIGHT, maxf(0.0, -sin(_phase)) * speed * 1.0 + (0.8 if air else 0.0))
-	_rot("rightleg", Vector3.RIGHT, maxf(0.0, sin(_phase)) * speed * 1.0 + (0.4 if air else 0.0))
-	# 총 드는 자세 (A포즈 기준)
-	_rot2("rightarm", Vector3(-1.2 - pitch * 0.8, 0, -0.9))
-	_rot2("leftarm", Vector3(-1.2 - pitch * 0.8, 0, 0.9))
-	_rot("rightforearm", Vector3.UP, -0.6)
-	_rot("leftforearm", Vector3.UP, 0.9)
-	_rot("head", Vector3.RIGHT, -pitch * 0.5)
+	if _bones.has("leftupleg"):
+		var hips_b := _parent_rest_basis("leftupleg")
+		var ul := _swing("leftupleg", -swing if not air else -0.6, hips_b)
+		var ur := _swing("rightupleg", swing if not air else 0.2, hips_b)
+		_swing("leftleg", maxf(0.0, -sin(_phase)) * speed * 1.1 + (1.0 if air else 0.0), ul)
+		_swing("rightleg", maxf(0.0, sin(_phase)) * speed * 1.1 + (0.5 if air else 0.0), ur)
+	# 총 드는 자세 (스켈레톤 공간: 정면 +Z, 캐릭터 오른쪽 -X)
+	var pq := Quaternion(Vector3.RIGHT, -pitch * 0.85)
+	if _bones.has("rightarm"):
+		var ra := _aim("rightarm", "rightforearm", pq * Vector3(0.12, -0.75, 0.55), _parent_rest_basis("rightarm"))
+		_aim("rightforearm", "righthand", pq * Vector3(0.3, -0.05, 0.95), ra)
+	if _bones.has("leftarm"):
+		var la := _aim("leftarm", "leftforearm", pq * Vector3(-0.35, -0.55, 0.75), _parent_rest_basis("leftarm"))
+		_aim("leftforearm", "lefthand", pq * Vector3(-0.6, 0.05, 0.8), la)
+	if _bones.has("head"):
+		_swing("head", -pitch * 0.5, _parent_rest_basis("head"))
+	if _bones.has("righthand"):
+		var hp := _skel.get_bone_global_pose(_bones["righthand"]).origin
+		gun_holder.global_position = _skel.global_transform * hp
+		gun_holder.rotation = Vector3(pitch, 0, 0)
 
 
 func _rot(key: String, axis: Vector3, ang: float) -> void:
