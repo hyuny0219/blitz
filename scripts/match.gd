@@ -33,10 +33,19 @@ func _ready() -> void:
 	add_to_group("match")
 
 
+func _exit_tree() -> void:
+	Input.emulate_mouse_from_touch = true
+
+
 func start(p_mode: String, p_map: String) -> void:
 	mode_id = p_mode
 	mode = Data.MODES[mode_id]
 	map_id = p_map
+	if Game.is_touch:
+		get_viewport().scaling_3d_scale = 0.75
+		Engine.max_fps = 60
+		# 경기 중엔 터치를 마우스로 흉내 내지 않는다 (시점이 튀는 원인)
+		Input.emulate_mouse_from_touch = false
 	MapBuilder.build(map_id, self)
 	nav_map = get_world_3d().navigation_map
 	_spawn_fighters()
@@ -406,6 +415,8 @@ func _end_match(won: bool, winner: Fighter) -> void:
 	Game.save()
 	Sfx.play("win" if won else "lose", -2.0)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	Input.emulate_mouse_from_touch = true
+	hud.reset_touch()
 	var res := {"won": won, "kills": player.kills, "deaths": player.deaths, "keys": keys_earned,
 		"scores": scores.duplicate(), "mode": mode_id, "map": map_id,
 		"winner": winner.display_name if winner else ""}
@@ -567,4 +578,6 @@ func toggle_pause() -> void:
 	get_tree().paused = paused
 	if paused:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if Game.is_touch:
+		Input.emulate_mouse_from_touch = paused
 	hud.reset_touch()

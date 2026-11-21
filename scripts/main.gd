@@ -20,6 +20,8 @@ func _ready() -> void:
 			Game.character = a.substr(7)
 		elif a.begins_with("--map="):
 			Game.map_id = a.substr(6)
+	if args.has("--touchtest"):
+		add_child(load("res://tests/touch_test.gd").new())
 	if args.has("--autoplay"):
 		_start_match()
 	elif args.has("--menu") or Array(args).any(func(a): return a.begins_with("--tab=")):

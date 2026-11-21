@@ -51,6 +51,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				m.toggle_pause()
 
 
+func _enemy_near_crosshair() -> bool:
+	var eye := me.head.global_position
+	var fwd := -me.head.global_basis.z
+	for f in m.fighters:
+		if f == me or not f.alive or not m.is_enemy(me, f):
+			continue
+		var to: Vector3 = f.global_position + Vector3(0, 1.3, 0) - eye
+		if to.length() > 60.0:
+			continue
+		if fwd.angle_to(to) < deg_to_rad(5.0):
+			return true
+	return false
+
+
 func _look(rel: Vector2) -> void:
 	var fov_k := 1.0
 	if me.cam:
@@ -97,7 +111,10 @@ func _physics_process(_delta: float) -> void:
 	me.in_aim = hud.aim_toggle or (captured and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 	var ld := hud.consume_look()
 	if ld != Vector2.ZERO:
-		_look(ld * 0.0042 * Game.sensitivity)
+		var k := 0.0036 * Game.sensitivity
+		if _enemy_near_crosshair():
+			k *= 0.6
+		_look(ld * k)
 	# 저격 후 조준 자동 해제(터치)
 	if hud.aim_toggle and me.wdata().kind != "sniper" and me.wdata().kind in ["knife", "grenade"]:
 		hud.aim_toggle = false

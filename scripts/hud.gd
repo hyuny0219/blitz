@@ -37,6 +37,8 @@ var hurt_rect: ColorRect
 var scope_rect: Control
 var pause_btn: Button
 var keys_lbl: Label
+var fps_lbl: Label
+var _fps_t := 0.0
 
 var _hit_t := 0.0
 var _hit_kill := false
@@ -151,11 +153,18 @@ func setup(match_node: Node, p: Fighter) -> void:
 	pause_btn.pressed.connect(func(): pause_requested.emit())
 	root.add_child(pause_btn)
 
+	fps_lbl = _label(root, "", 14, Color(1, 1, 1, 0.55))
+	fps_lbl.position = Vector2(80, 26)
+
 	flash_rect = ColorRect.new()
 	flash_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	flash_rect.color = Color(1, 1, 1, 0)
 	flash_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(flash_rect)
+	if touch:
+		pause_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for b in slot_btns:
+			b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_style_slots()
 
 
@@ -171,7 +180,14 @@ func _label(parent: Control, text: String, size: int, col: Color) -> Label:
 	return l
 
 
+var _slot_key := ""
+
+
 func _style_slots() -> void:
+	var key := "%s|%d|%d" % [str(player.slots), player.cur, player.util_left]
+	if key == _slot_key:
+		return
+	_slot_key = key
 	for i in slot_btns.size():
 		var b := slot_btns[i]
 		if i >= player.slots.size():
@@ -255,19 +271,23 @@ func _process(delta: float) -> void:
 			center_lbl.modulate.a = maxf(0.0, _center_t / 0.3)
 			sub_lbl.modulate.a = center_lbl.modulate.a
 	var hp := int(ceil(player.health))
-	health_lbl.text = "✚ %d" % hp
+	_set_text(health_lbl, "✚ %d" % hp)
 	health_lbl.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6) if hp > 50 else (Color(1, 0.85, 0.3) if hp > 25 else Color(1, 0.35, 0.3)))
 	var w := player.wdata()
-	wname_lbl.text = w.name
+	_set_text(wname_lbl, w.name)
 	if w.kind == "knife":
-		ammo_lbl.text = "—"
+		_set_text(ammo_lbl, "—")
 	elif w.kind == "grenade":
-		ammo_lbl.text = "× %d" % player.util_left
+		_set_text(ammo_lbl, "× %d" % player.util_left)
+	elif player.reload_t > 0.0:
+		_set_text(ammo_lbl, "재장전…")
 	else:
 		var a: Array = player.ammo[player.wid()]
-		ammo_lbl.text = "%d / %d" % [a[0], a[1]]
-		if player.reload_t > 0.0:
-			ammo_lbl.text = "재장전…"
+		_set_text(ammo_lbl, "%d / %d" % [a[0], a[1]])
+	_fps_t -= delta
+	if _fps_t <= 0.0:
+		_fps_t = 0.5
+		_set_text(fps_lbl, "%d FPS" % Engine.get_frames_per_second())
 	hurt_rect.color.a = clampf((1.0 - player.health / player.max_health) * 0.35 - 0.05, 0.0, 0.3) if player.alive else 0.25
 	flash_rect.color.a = clampf(player.flashed / 1.2, 0.0, 1.0)
 	scope_rect.visible = player.scoped
@@ -277,6 +297,11 @@ func _process(delta: float) -> void:
 	draw.queue_redraw()
 	if scope_rect.visible:
 		scope_rect.queue_redraw()
+
+
+func _set_text(l: Label, t: String) -> void:
+	if l.text != t:
+		l.text = t
 
 
 func _draw_scope() -> void:
@@ -399,26 +424,52 @@ func _input(event: InputEvent) -> void:
 		if not _touches.has(e.index):
 			return
 		var t: Dictionary = _touches[e.index]
+		# relative 대신 직접 계산한 위치 차이를 쓴다 (손가락 번호가 꼬여도 튀지 않게)
+		var d: Vector2 = e.position - t.pos
+		t.pos = e.position
+		if d.length() > 90.0:
+			return  # 한 번에 너무 크게 움직였다면 잘못된 이벤트로 보고 무시
 		var role: String = t.role
 		if role == "move":
 			var u := root.size.y / 720.0
 			var v := (e.position - _stick_center) / (60.0 * u)
 			v = v.limit_length(1.0)
+			if v.length() < 0.12:
+				v = Vector2.ZERO
 			move_vec = Vector2(v.x, -v.y)
-		elif role in ["look", "fire", "fire2", "aim"]:
-			look_delta += e.relative
-		t.pos = e.position
+		elif role == "look":
+			look_delta += d
+		elif role in ["fire", "fire2", "aim"]:
+			# 버튼 위에서는 손가락이 조금 떨려도 시점이 돌지 않게 여유를 둔다
+			if not t.moved:
+				if (e.position - t.start).length() < 14.0:
+					return
+				t.moved = true
+			look_delta += d
 
 
 func _touch_down(idx: int, pos: Vector2) -> void:
+	if OS.get_cmdline_user_args().has("--touchtest"):
+		print("  down ", idx, " ", pos)
 	_layout_buttons()
-	# UI 버튼(슬롯/일시정지) 위면 무시
-	if _over_ui(pos):
+	if _touches.has(idx):
+		_touch_up(idx)
+	# 일시정지 / 무기 칸
+	if pause_btn.get_global_rect().grow(10).has_point(pos):
+		_touches[idx] = {"role": "ui", "pos": pos, "start": pos, "moved": false}
+		pause_requested.emit()
 		return
+	if slots_box.visible:
+		for i in slot_btns.size():
+			var b := slot_btns[i]
+			if b.visible and b.get_global_rect().grow(6).has_point(pos):
+				_touches[idx] = {"role": "ui", "pos": pos, "start": pos, "moved": false}
+				slot_tapped.emit(i)
+				return
 	for k in _btn:
 		var b: Dictionary = _btn[k]
 		if pos.distance_to(b.pos) <= b.r * 1.15:
-			_touches[idx] = {"role": k, "pos": pos}
+			_touches[idx] = {"role": k, "pos": pos, "start": pos, "moved": false}
 			match k:
 				"fire", "fire2":
 					fire_held = true
@@ -431,16 +482,18 @@ func _touch_down(idx: int, pos: Vector2) -> void:
 				"swap":
 					slot_tapped.emit(-1)
 			return
-	if pos.x < root.size.x * 0.42:
-		_touches[idx] = {"role": "move", "pos": pos}
+	if pos.x < root.size.x * 0.45:
+		_touches[idx] = {"role": "move", "pos": pos, "start": pos, "moved": false}
 		_stick_center = pos
 		_stick_active = true
 		move_vec = Vector2.ZERO
 	else:
-		_touches[idx] = {"role": "look", "pos": pos}
+		_touches[idx] = {"role": "look", "pos": pos, "start": pos, "moved": false}
 
 
 func _touch_up(idx: int) -> void:
+	if OS.get_cmdline_user_args().has("--touchtest"):
+		print("  up ", idx, " ", _touches.get(idx, {}).get("role", "-"))
 	if not _touches.has(idx):
 		return
 	var role: String = _touches[idx].role
@@ -453,16 +506,6 @@ func _touch_up(idx: int) -> void:
 		for t in _touches.values():
 			if t.role.begins_with("fire"):
 				fire_held = true
-
-
-func _over_ui(pos: Vector2) -> bool:
-	if pause_btn.get_global_rect().grow(6).has_point(pos):
-		return true
-	if slots_box.visible:
-		for b in slot_btns:
-			if b.visible and b.get_global_rect().grow(4).has_point(pos):
-				return true
-	return false
 
 
 func consume_look() -> Vector2:
