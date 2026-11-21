@@ -8,7 +8,6 @@ var rig: Node3D
 var gun: Node3D
 var arms: Node3D
 var flash_node: MeshInstance3D
-var light: OmniLight3D
 var wid := ""
 var _bob := 0.0
 var _kick := 0.0
@@ -44,11 +43,6 @@ func setup(c: Dictionary) -> void:
 	flash_node.material_override = fm
 	flash_node.visible = false
 	flash_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	light = OmniLight3D.new()
-	light.light_color = Color(1.0, 0.8, 0.45)
-	light.omni_range = 4.0
-	light.light_energy = 0.0
-	add_child(light)
 
 
 func set_weapon(id: String, instant: bool) -> void:
@@ -127,7 +121,6 @@ func on_fire(recoil: float) -> void:
 	flash_node.rotation.z = randf() * TAU
 	var s := 1.0 + recoil * 0.15
 	flash_node.scale = Vector3.ONE * randf_range(0.8, 1.2) * s
-	light.light_energy = 2.5
 
 
 func on_reload(t: float) -> void:
@@ -146,9 +139,6 @@ func update_motion(delta: float, speed: float, on_floor: bool, scoped: bool) -> 
 		_flash_t -= delta
 		if _flash_t <= 0.0:
 			flash_node.visible = false
-	light.light_energy = move_toward(light.light_energy, 0.0, delta * 60.0)
-	if gun:
-		light.global_position = muzzle_global()
 	# 시점 흔들림(스웨이)
 	var cb := get_parent_node_3d().global_basis
 	if _last_cam_basis != Basis():

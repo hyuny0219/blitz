@@ -16,6 +16,8 @@ func _ready() -> void:
 	for a in args:
 		if a.begins_with("--mode="):
 			Game.mode = a.substr(7)
+		elif a.begins_with("--char="):
+			Game.character = a.substr(7)
 		elif a.begins_with("--map="):
 			Game.map_id = a.substr(6)
 	if args.has("--autoplay"):

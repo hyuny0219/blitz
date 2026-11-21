@@ -60,6 +60,57 @@ func start(p_mode: String, p_map: String) -> void:
 		_start_round()
 	else:
 		_start_ffa()
+	await _prewarm()
+
+
+## WebGL은 처음 보는 재질/효과를 그릴 때 셰이더를 컴파일하느라 화면이 멈칫한다.
+## 경기 시작 직후 가림막 뒤에서 모든 효과와 캐릭터를 한 번씩 그려 미리 컴파일해 둔다.
+func _prewarm() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 30
+	add_child(layer)
+	var cover := ColorRect.new()
+	cover.color = Color(0.03, 0.04, 0.08)
+	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(cover)
+	var l := UiKit.label("준비 중…", 30, Color(1, 0.85, 0.4), true)
+	l.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	l.offset_left = -200
+	l.offset_right = 200
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(l)
+	var eye := player.head.global_position
+	var fwd := -player.head.global_basis.z
+	var p := eye + fwd * 2.5
+	Effects.tracer(self, eye + Vector3(0.2, -0.2, 0), p)
+	Effects.impact(self, p, -fwd)
+	Effects.burst(self, p, Color(1, 0.5, 0.2), 6, 2.0, 0.05, 0.3)
+	Effects.explosion(self, p + fwd * 2.0)
+	Effects.smoke_cloud(self, p + fwd * 3.0, 1.0, 0.1)
+	var temp := []
+	for w in ["he", "flash", "smoke"] + player.slots:
+		var g := WeaponModel.build(w)
+		add_child(g)
+		g.global_position = p + Vector3(randf_range(-0.5, 0.5), 0, 0)
+		temp.append(g)
+	player.viewmodel.on_fire(1.0)
+	for f in fighters:
+		f.model.flash()
+	var saved_yaw := player.yaw
+	for i in 5:
+		player.yaw = saved_yaw + i * PI / 2.0
+		await RenderingServer.frame_post_draw
+		await RenderingServer.frame_post_draw
+	player.yaw = saved_yaw
+	for f in fighters:
+		f.model.flash()
+	await RenderingServer.frame_post_draw
+	for g in temp:
+		g.queue_free()
+	var tw := cover.create_tween()
+	tw.tween_property(cover, "color:a", 0.0, 0.25)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.2)
+	tw.tween_callback(layer.queue_free)
 
 
 func _spawn_fighters() -> void:

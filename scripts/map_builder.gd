@@ -262,6 +262,10 @@ static func _env(info: Dictionary, root: Node3D) -> void:
 	sun.directional_shadow_max_distance = 60.0
 	sun.shadow_bias = 0.05
 	root.add_child(sun)
+	if Game.is_touch:
+		# 폰: 그림자 거리와 글로우를 줄여 프레임 확보
+		sun.directional_shadow_max_distance = 32.0
+		env.glow_enabled = false
 
 
 # ------------------------------------------------------------------ 레이아웃

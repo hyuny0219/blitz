@@ -56,6 +56,8 @@ var invuln := 0.0
 var step_t := 0.0
 var last_attacker: Fighter
 var last_damage_dir := Vector3.ZERO
+var _eye_prev := Vector3.ZERO
+var _eye_cur := Vector3.ZERO
 
 
 func setup(p_team: int, p_name: String, p_char: String, p_slots: Array, p_player: bool, m: Node) -> void:
@@ -91,7 +93,8 @@ func setup(p_team: int, p_name: String, p_char: String, p_slots: Array, p_player
 		cam.fov = 80
 		cam.near = 0.04
 		cam.far = 300
-		head.add_child(cam)
+		add_child(cam)
+		cam.top_level = true
 		cam.current = true
 		viewmodel = Viewmodel.new()
 		cam.add_child(viewmodel)
@@ -205,7 +208,7 @@ func _physics_process(delta: float) -> void:
 	recoil_idle += delta
 	if recoil_idle > 0.12:
 		recoil = move_toward(recoil, 0.0, delta * 9.0)
-	view_kick = move_toward(view_kick, 0.0, delta * (6.0 + view_kick * 6.0))
+	view_kick = lerpf(view_kick, 0.0, minf(1.0, delta * 10.0))
 
 	if not alive:
 		velocity.x = move_toward(velocity.x, 0, delta * 20)
@@ -253,6 +256,9 @@ func _physics_process(delta: float) -> void:
 				Sfx.play_at("step", global_position, -6.0)
 
 	model.animate(delta, clampf(hs / BASE_SPEED, 0.0, 1.0), not is_on_floor(), pitch)
+	if is_player:
+		_eye_prev = _eye_cur
+		_eye_cur = head.global_position
 
 	# 조준
 	var can_scope: bool = int(w.scope) > 0
@@ -275,6 +281,24 @@ func _physics_process(delta: float) -> void:
 		elif in_aim and w.kind != "grenade" and w.kind != "knife":
 			target_fov = 68.0
 		cam.fov = lerpf(cam.fov, target_fov, minf(1.0, delta * 18.0))
+
+
+## 플레이어 카메라: 물리 틱 사이를 보간하고 회전은 매 프레임 적용 (끊김 방지)
+func _process(_delta: float) -> void:
+	if not is_player or cam == null:
+		return
+	var f := Engine.get_physics_interpolation_fraction()
+	if alive:
+		cam.global_position = _eye_prev.lerp(_eye_cur, f)
+	else:
+		cam.global_position = head.global_position
+	cam.global_rotation = Vector3(pitch + deg_to_rad(view_kick), yaw, 0.0)
+
+
+func snap_camera() -> void:
+	if head:
+		_eye_prev = head.global_position
+		_eye_cur = _eye_prev
 
 
 func move_frac() -> float:
@@ -352,7 +376,7 @@ func _try_fire(pressed: bool) -> void:
 			Effects.tracer(get_parent(), muzzle, end)
 	recoil += float(w.recoil)
 	if is_player:
-		view_kick += float(w.recoil) * 0.55
+		view_kick += float(w.recoil) * (0.22 if Game.is_touch else 0.4)
 		viewmodel.on_fire(float(w.recoil))
 		Sfx.play(Sfx.gun_sound(w.kind, wid()), -2.0)
 	else:
@@ -496,6 +520,7 @@ func respawn_at(pos: Vector3, face_yaw: float) -> void:
 	pitch = 0.0
 	rotation.y = yaw
 	reset_for_round()
+	snap_camera()
 	if is_player:
 		viewmodel.visible = true
 

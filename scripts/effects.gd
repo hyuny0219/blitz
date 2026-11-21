@@ -111,15 +111,6 @@ static func explosion(world: Node3D, pos: Vector3) -> void:
 	var tw := s.create_tween()
 	tw.tween_property(s, "scale", Vector3.ONE * 3.5, 0.25).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(s.queue_free)
-	var l := OmniLight3D.new()
-	l.light_color = Color(1.0, 0.7, 0.3)
-	l.light_energy = 6.0
-	l.omni_range = 10.0
-	world.add_child(l)
-	l.global_position = pos + Vector3.UP
-	var tw2 := l.create_tween()
-	tw2.tween_property(l, "light_energy", 0.0, 0.4)
-	tw2.tween_callback(l.queue_free)
 
 
 static func smoke_cloud(world: Node3D, pos: Vector3, radius: float, duration: float) -> Node3D:
