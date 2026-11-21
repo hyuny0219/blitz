@@ -103,6 +103,20 @@ static func slider_row(text: String, mn: float, mx: float, val: float, cb: Calla
 	return row
 
 
+static func toggle_row(text: String, val: bool, cb: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	var l := label(text, 22)
+	l.custom_minimum_size = Vector2(200, 0)
+	row.add_child(l)
+	var b := CheckButton.new()
+	b.button_pressed = val
+	b.focus_mode = Control.FOCUS_NONE
+	b.toggled.connect(cb)
+	row.add_child(b)
+	return row
+
+
 static func stat_bar(name: String, v: float, col: Color = Color(1.0, 0.6, 0.15)) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)

@@ -20,6 +20,7 @@ var reload_tap := false
 var _touches := {}   # index -> {role, start, pos}
 var _stick_center := Vector2.ZERO
 var _stick_active := false
+var _hint_t := 4.0
 
 var root: Control
 var draw: Control
@@ -265,6 +266,10 @@ func _process(delta: float) -> void:
 	if player == null:
 		return
 	_hit_t = maxf(0.0, _hit_t - delta)
+	if _stick_active:
+		_hint_t = 0.0
+	else:
+		_hint_t = maxf(0.0, _hint_t - delta * 0.25)
 	_dmg_dir_t = maxf(0.0, _dmg_dir_t - delta)
 	if _center_t > 0.0:
 		_center_t -= delta
@@ -374,42 +379,135 @@ func _draw_overlay() -> void:
 # ------------------------------------------------------------------ 터치 UI
 func _layout_buttons() -> void:
 	var s := root.size
-	var u := s.y / 720.0
+	var u := s.y / 720.0 * Game.btn_scale
+	var W := s.x
+	var H := s.y
+	var k := s.y / 720.0
+	# 오른손 엄지가 발사 버튼을 중심으로 닿는 반원 배치
 	_btn = {
-		"fire": {"pos": Vector2(s.x - 170 * u, s.y - 190 * u), "r": 74 * u, "label": "발사"},
-		"fire2": {"pos": Vector2(150 * u, s.y - 360 * u), "r": 48 * u, "label": "발사"},
-		"aim": {"pos": Vector2(s.x - 330 * u, s.y - 270 * u), "r": 46 * u, "label": "조준"},
-		"jump": {"pos": Vector2(s.x - 84 * u, s.y - 330 * u), "r": 50 * u, "label": "점프"},
-		"reload": {"pos": Vector2(s.x - 300 * u, s.y - 110 * u), "r": 42 * u, "label": "장전"},
-		"swap": {"pos": Vector2(s.x - 84 * u, s.y - 480 * u), "r": 40 * u, "label": "교체"},
-		"slide": {"pos": Vector2(s.x - 225 * u, s.y - 400 * u), "r": 44 * u, "label": "슬라이드"},
+		"fire": {"pos": Vector2(W - 200 * k, H - 205 * k), "r": 80 * u, "label": "발사", "icon": "fire"},
+		"aim": {"pos": Vector2(W - 350 * k, H - 140 * k), "r": 46 * u, "label": "조준", "icon": "aim"},
+		"reload": {"pos": Vector2(W - 345 * k, H - 300 * k), "r": 40 * u, "label": "장전", "icon": "reload"},
+		"jump": {"pos": Vector2(W - 82 * k, H - 318 * k), "r": 54 * u, "label": "점프", "icon": "jump"},
+		"slide": {"pos": Vector2(W - 72 * k, H - 76 * k), "r": 46 * u, "label": "슬라이드", "icon": "slide"},
+		"swap": {"pos": Vector2(W - 74 * k, H - 462 * k), "r": 38 * u, "label": "교체", "icon": "swap"},
 	}
+	if Game.left_fire:
+		_btn["fire2"] = {"pos": Vector2(140 * k, H - 400 * k), "r": 50 * u, "label": "발사", "icon": "fire"}
+
+
+func _btn_held(k: String) -> bool:
+	for t in _touches.values():
+		if t.role == k:
+			return true
+	return false
 
 
 func _draw_touch() -> void:
 	_layout_buttons()
 	var font := draw.get_theme_default_font()
+	var a: float = Game.btn_alpha
+	var now := Time.get_ticks_msec() / 1000.0
 	for k in _btn:
 		var b: Dictionary = _btn[k]
-		var held := false
-		for t in _touches.values():
-			if t.role == k:
-				held = true
-		var on: bool = held or (k == "aim" and aim_toggle)
-		var bg := Color(1, 0.55, 0.15, 0.55) if on else Color(0.05, 0.07, 0.1, 0.38)
-		if k.begins_with("fire"):
-			bg = Color(0.95, 0.25, 0.2, 0.65) if held else Color(0.85, 0.2, 0.15, 0.4)
-		draw.draw_circle(b.pos, b.r, bg)
-		draw.draw_arc(b.pos, b.r, 0, TAU, 40, Color(1, 1, 1, 0.5), 3)
-		var fs := int(b.r * (0.32 if b.label.length() > 2 else 0.42))
+		var held := _btn_held(k)
+		var on: bool = held or (k == "aim" and (aim_toggle or player.scoped))
+		var r: float = b.r * (0.92 if held else 1.0)
+		var c: Vector2 = b.pos
+		var is_fire: bool = str(k).begins_with("fire")
+		# 그림자 + 유리판 원
+		draw.draw_circle(c + Vector2(0, 4), r, Color(0, 0, 0, 0.25 * a))
+		var fill := Color(0.06, 0.08, 0.13, 0.5 * a)
+		if is_fire:
+			fill = Color(0.92, 0.27, 0.18, (0.85 if held else 0.62) * a)
+		elif on:
+			fill = Color(1.0, 0.6, 0.15, 0.85 * a)
+		draw.draw_circle(c, r, fill)
+		draw.draw_circle(c + Vector2(0, -r * 0.35), r * 0.62, Color(1, 1, 1, 0.06 * a))
+		draw.draw_arc(c, r, 0, TAU, 48, Color(1, 1, 1, (0.75 if on or held else 0.4) * a), 2.5)
+		# 상태 링: 발사=탄약, 장전=진행도, 슬라이드=재사용 대기
+		var ring := -1.0
+		var w := player.wdata()
+		if is_fire and int(w.mag) > 0 and w.kind != "grenade":
+			ring = float(player.ammo[player.wid()][0]) / float(w.mag)
+		elif k == "reload" and player.reload_t > 0.0:
+			ring = 1.0 - player.reload_t / maxf(0.01, float(w.reload))
+		elif k == "slide" and (player.slide_cd > 0.0 or player.is_sliding()):
+			ring = 1.0 - player.slide_cd / 0.45 if not player.is_sliding() else 0.0
+		if ring >= 0.0:
+			draw.draw_arc(c, r + 5, -PI / 2, -PI / 2 + TAU * clampf(ring, 0.0, 1.0), 48,
+				Color(1, 0.85, 0.3, 0.95 * a) if not (is_fire and ring < 0.25) else Color(1, 0.3, 0.25, a), 4)
+		# 아이콘
+		var ic := Color(1, 1, 1, 0.95 * maxf(a, 0.6))
+		if on and not is_fire:
+			ic = Color(0.08, 0.06, 0.04, 0.95)
+		_icon(b.icon, c + Vector2(0, -r * 0.1), r * 0.42, ic)
+		# 작은 글자
+		var fs := int(clampf(r * 0.24, 11, 18))
 		var ts := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-		draw.draw_string(font, b.pos + Vector2(-ts.x / 2, fs * 0.35), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(1, 1, 1, 0.95))
+		draw.draw_string(font, c + Vector2(-ts.x / 2, r * 0.62), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(ic.r, ic.g, ic.b, 0.85 * ic.a))
+	# 수류탄 개수 배지(교체 버튼 옆 대신 무기 칸에서 이미 표시)
 	# 조이스틱
-	var u := root.size.y / 720.0
-	var base := _stick_center if _stick_active else Vector2(190 * u, root.size.y - 170 * u)
-	draw.draw_circle(base, 90 * u, Color(0.05, 0.07, 0.1, 0.3))
-	draw.draw_arc(base, 90 * u, 0, TAU, 40, Color(1, 1, 1, 0.35), 3)
-	draw.draw_circle(base + move_vec * Vector2(1, -1) * 60 * u, 40 * u, Color(1, 1, 1, 0.5))
+	var k2 := root.size.y / 720.0 * Game.btn_scale
+	var base := _stick_center if _stick_active else Vector2(200 * root.size.y / 720.0, root.size.y - 185 * root.size.y / 720.0)
+	var br := 92 * k2
+	var ba := (1.0 if _stick_active else 0.55) * a
+	draw.draw_circle(base, br, Color(0.06, 0.08, 0.13, 0.35 * ba))
+	draw.draw_arc(base, br, 0, TAU, 56, Color(1, 1, 1, 0.35 * ba), 2.5)
+	for i in 4:
+		var ang := i * PI / 2 - PI / 2
+		var dv := Vector2(cos(ang), sin(ang))
+		var tip := base + dv * (br - 14 * k2)
+		var side := Vector2(-dv.y, dv.x) * 7 * k2
+		draw.draw_colored_polygon(PackedVector2Array([tip, tip - dv * 10 * k2 + side, tip - dv * 10 * k2 - side]), Color(1, 1, 1, 0.45 * ba))
+	var knob := base + move_vec * Vector2(1, -1) * 60 * k2
+	draw.draw_circle(knob + Vector2(0, 3), 40 * k2, Color(0, 0, 0, 0.25 * ba))
+	draw.draw_circle(knob, 40 * k2, Color(1, 1, 1, 0.55 * ba))
+	draw.draw_circle(knob + Vector2(0, -10 * k2), 26 * k2, Color(1, 1, 1, 0.25 * ba))
+	if not _stick_active and _hint_t > 0.0:
+		var hf := root.get_theme_default_font()
+		var hs := "여기를 눌러 이동"
+		var hsz := hf.get_string_size(hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 16)
+		draw.draw_string(hf, base + Vector2(-hsz.x / 2, -br - 12), hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1, 1, 1, 0.7 * minf(1.0, _hint_t)))
+
+
+## 단순한 선 아이콘 (s = 크기 기준)
+func _icon(kind: String, c: Vector2, s: float, col: Color) -> void:
+	var w := maxf(2.0, s * 0.14)
+	match kind:
+		"fire":
+			draw.draw_arc(c, s * 0.62, 0, TAU, 32, col, w)
+			for d in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+				draw.draw_line(c + d * s * 0.3, c + d * s * 0.95, col, w)
+			draw.draw_circle(c, w * 0.8, col)
+		"aim":
+			var q := s * 0.75
+			for sx in [-1.0, 1.0]:
+				for sy in [-1.0, 1.0]:
+					var corner := c + Vector2(sx * q, sy * q * 0.8)
+					draw.draw_line(corner, corner + Vector2(-sx * q * 0.45, 0), col, w)
+					draw.draw_line(corner, corner + Vector2(0, -sy * q * 0.45), col, w)
+			draw.draw_circle(c, w, col)
+		"reload":
+			draw.draw_arc(c, s * 0.6, -PI * 0.25, PI * 1.45, 28, col, w)
+			var tip := c + Vector2(cos(-PI * 0.25), sin(-PI * 0.25)) * s * 0.6
+			draw.draw_colored_polygon(PackedVector2Array([tip + Vector2(s * 0.3, 0), tip + Vector2(-s * 0.12, -s * 0.28), tip + Vector2(-s * 0.1, s * 0.25)]), col)
+		"jump":
+			for i in 2:
+				var y := c.y + s * 0.15 - i * s * 0.5
+				draw.draw_polyline(PackedVector2Array([Vector2(c.x - s * 0.6, y + s * 0.3), Vector2(c.x, y - s * 0.25), Vector2(c.x + s * 0.6, y + s * 0.3)]), col, w)
+		"slide":
+			draw.draw_line(c + Vector2(-s * 0.8, s * 0.45), c + Vector2(s * 0.8, s * 0.45), col, w)
+			draw.draw_polyline(PackedVector2Array([c + Vector2(-s * 0.5, -s * 0.5), c + Vector2(-s * 0.1, s * 0.2), c + Vector2(s * 0.7, s * 0.2)]), col, w)
+			draw.draw_circle(c + Vector2(-s * 0.55, -s * 0.72), s * 0.18, col)
+			for i in 3:
+				var yy := c.y - s * 0.25 + i * s * 0.2
+				draw.draw_line(Vector2(c.x + s * 0.35, yy - s * 0.3), Vector2(c.x + s * 0.85, yy - s * 0.3), Color(col.r, col.g, col.b, col.a * 0.6), w * 0.6)
+		"swap":
+			draw.draw_line(c + Vector2(-s * 0.6, -s * 0.25), c + Vector2(s * 0.6, -s * 0.25), col, w)
+			draw.draw_colored_polygon(PackedVector2Array([c + Vector2(s * 0.8, -s * 0.25), c + Vector2(s * 0.45, -s * 0.5), c + Vector2(s * 0.45, 0)]), col)
+			draw.draw_line(c + Vector2(s * 0.6, s * 0.3), c + Vector2(-s * 0.6, s * 0.3), col, w)
+			draw.draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.8, s * 0.3), c + Vector2(-s * 0.45, s * 0.05), c + Vector2(-s * 0.45, s * 0.55)]), col)
 
 
 func _input(event: InputEvent) -> void:
@@ -468,24 +566,32 @@ func _touch_down(idx: int, pos: Vector2) -> void:
 				_touches[idx] = {"role": "ui", "pos": pos, "start": pos, "moved": false}
 				slot_tapped.emit(i)
 				return
-	for k in _btn:
-		var b: Dictionary = _btn[k]
-		if pos.distance_to(b.pos) <= b.r * 1.15:
-			_touches[idx] = {"role": k, "pos": pos, "start": pos, "moved": false}
-			match k:
-				"fire", "fire2":
-					fire_held = true
-				"aim":
-					aim_toggle = not aim_toggle
-				"jump":
-					jump_tap = true
-				"slide":
-					slide_tap = true
-				"reload":
-					reload_tap = true
-				"swap":
-					slot_tapped.emit(-1)
-			return
+	var best := ""
+	var best_d := INF
+	for kk in _btn:
+		var bb: Dictionary = _btn[kk]
+		var dd: float = pos.distance_to(bb.pos) / bb.r
+		if dd <= 1.3 and dd < best_d:
+			best_d = dd
+			best = kk
+	if best != "":
+		var k := best
+		_touches[idx] = {"role": k, "pos": pos, "start": pos, "moved": false}
+		_buzz(12)
+		match k:
+			"fire", "fire2":
+				fire_held = true
+			"aim":
+				aim_toggle = not aim_toggle
+			"jump":
+				jump_tap = true
+			"slide":
+				slide_tap = true
+			"reload":
+				reload_tap = true
+			"swap":
+				slot_tapped.emit(-1)
+		return
 	if pos.x < root.size.x * 0.45:
 		_touches[idx] = {"role": "move", "pos": pos, "start": pos, "moved": false}
 		_stick_center = pos
@@ -510,6 +616,11 @@ func _touch_up(idx: int) -> void:
 		for t in _touches.values():
 			if t.role.begins_with("fire"):
 				fire_held = true
+
+
+func _buzz(ms: int) -> void:
+	if Game.haptics:
+		Input.vibrate_handheld(ms)
 
 
 func consume_look() -> Vector2:

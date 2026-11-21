@@ -10,6 +10,10 @@ var loadout := {"primary": "m4a4", "secondary": "glock", "melee": "knife", "util
 var sensitivity: float = 1.0
 var volume: float = 0.8
 var difficulty: int = 1
+var btn_scale: float = 1.0
+var btn_alpha: float = 0.85
+var left_fire: bool = true
+var haptics: bool = true
 var stats := {"wins": 0, "losses": 0, "kills": 0, "deaths": 0}
 
 # 다음 매치
@@ -74,7 +78,7 @@ func save() -> void:
 	f.store_string(JSON.stringify({
 		"keys": keys, "unlocked": unlocked, "character": character, "loadout": loadout,
 		"sensitivity": sensitivity, "volume": volume, "difficulty": difficulty, "stats": stats,
-		"mode": mode, "map": map_id,
+		"mode": mode, "map": map_id, "btn_scale": btn_scale, "btn_alpha": btn_alpha, "left_fire": left_fire, "haptics": haptics,
 	}))
 
 
@@ -102,6 +106,10 @@ func load_save() -> void:
 	if typeof(st) == TYPE_DICTIONARY:
 		for k in stats.keys():
 			stats[k] = int(st.get(k, 0))
+	btn_scale = clampf(float(d.get("btn_scale", btn_scale)), 0.7, 1.4)
+	btn_alpha = clampf(float(d.get("btn_alpha", btn_alpha)), 0.3, 1.0)
+	left_fire = bool(d.get("left_fire", left_fire))
+	haptics = bool(d.get("haptics", haptics))
 	mode = str(d.get("mode", mode))
 	if not Data.MODES.has(mode):
 		mode = "duel1"

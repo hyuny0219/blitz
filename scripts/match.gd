@@ -330,6 +330,7 @@ func _on_died(victim: Fighter, killer: Fighter, wid: String, head: bool) -> void
 		killer.kills += 1
 	if killer == player and victim != player:
 		hud.hit_marker(true, head)
+		hud._buzz(35)
 		Sfx.play("kill", -4.0)
 		if head:
 			Sfx.play("headshot", -4.0)
@@ -543,8 +544,8 @@ func _build_pause() -> void:
 	pause_layer.add_child(bg)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.size = Vector2(420, 380)
-	box.position = Vector2(-210, -190)
+	box.size = Vector2(460, 520)
+	box.position = Vector2(-230, -260)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	box.theme = UiKit.theme
@@ -558,6 +559,9 @@ func _build_pause() -> void:
 	box.add_child(sl)
 	var vl := UiKit.slider_row("소리", 0.0, 1.0, Game.volume, func(v): Game.set_volume(v))
 	box.add_child(vl)
+	if Game.is_touch:
+		box.add_child(UiKit.slider_row("버튼 크기", 0.7, 1.4, Game.btn_scale, func(v): Game.btn_scale = v; Game.save()))
+		box.add_child(UiKit.slider_row("버튼 진하기", 0.3, 1.0, Game.btn_alpha, func(v): Game.btn_alpha = v; Game.save()))
 	var r := UiKit.big_button("계속하기", Color(1.0, 0.6, 0.15))
 	r.pressed.connect(toggle_pause)
 	box.add_child(r)
