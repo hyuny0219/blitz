@@ -75,6 +75,12 @@ func _ready() -> void:
 	keys_lbl = UiKit.label("", 24, Color(1.0, 0.85, 0.35))
 	kp.add_child(keys_lbl)
 
+	var ver := UiKit.label("v" + BuildInfo.VERSION, 14, Color(1, 1, 1, 0.45))
+	ver.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	ver.offset_left = -140
+	ver.offset_top = -26
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(ver)
 	content = Control.new()
 	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(content)

@@ -79,6 +79,11 @@ func _show_title() -> void:
 	tap.offset_left = -400
 	tap.offset_right = 400
 	title.add_child(tap)
+	var ver := UiKit.label("v" + BuildInfo.VERSION, 16, Color(1, 1, 1, 0.6))
+	ver.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	ver.offset_left = -160
+	ver.offset_top = -30
+	title.add_child(ver)
 	var tw := tap.create_tween().set_loops()
 	tw.tween_property(tap, "modulate:a", 0.35, 0.7)
 	tw.tween_property(tap, "modulate:a", 1.0, 0.7)
