@@ -32,6 +32,13 @@ var aim_error := 0.0   # 봇 조준 오차(도)
 # 입력
 var in_move := Vector2.ZERO
 var in_jump := false
+var in_slide := false   # 한 번 누르면 슬라이드 시도 (사용 후 자동 해제)
+var slide_t := 0.0
+var slide_cd := 0.0
+var _slide_k := 0.0     # 0~1 자세 보간
+var _col_shape: CapsuleShape3D
+var _col_node: CollisionShape3D
+const SLIDE_TIME := 0.75
 var in_fire := false
 var in_aim := false
 var _fire_prev := false
@@ -82,6 +89,8 @@ func setup(p_team: int, p_name: String, p_char: String, p_slots: Array, p_player
 	cs.shape = cap
 	cs.position.y = 0.9
 	add_child(cs)
+	_col_shape = cap
+	_col_node = cs
 	model = CharacterModel.new()
 	add_child(model)
 	model.build(char_id)
@@ -135,6 +144,13 @@ func reset_for_round() -> void:
 	flashed = 0.0
 	invuln = 1.0
 	velocity = Vector3.ZERO
+	slide_t = 0.0
+	slide_cd = 0.0
+	_slide_k = 0.0
+	if _col_shape:
+		_set_low(false)
+	if head:
+		head.position.y = EYE
 	model.visible = true
 	model.rotation = Vector3.ZERO
 	model.position = Vector3.ZERO
@@ -232,18 +248,61 @@ func _physics_process(delta: float) -> void:
 	var mv := in_move.limit_length(1.0)
 	var dir := Basis(Vector3.UP, yaw) * Vector3(mv.x, 0, -mv.y)
 	var target := dir * spd
-	var accel := 16.0 if is_on_floor() else 4.0
-	velocity.x = move_toward(velocity.x, target.x, accel * spd * delta)
-	velocity.z = move_toward(velocity.z, target.z, accel * spd * delta)
+	slide_cd = maxf(0.0, slide_cd - delta)
+	var hs0 := Vector2(velocity.x, velocity.z).length()
+	# 슬라이드 시작: 바닥에서 움직이는 중일 때
+	if in_slide and slide_t <= 0.0 and slide_cd <= 0.0 and is_on_floor() and (hs0 > 2.5 or mv.length() > 0.3):
+		var sd := Vector3(velocity.x, 0, velocity.z).normalized() if hs0 > 2.5 else dir.normalized()
+		var sp := maxf(hs0 * 1.6, 12.0)
+		velocity.x = sd.x * sp
+		velocity.z = sd.z * sp
+		slide_t = SLIDE_TIME
+		_set_low(true)
+		if is_player:
+			Sfx.play("slide", -4.0)
+		else:
+			Sfx.play_at("slide", global_position, -2.0)
+	in_slide = false
+	if slide_t > 0.0:
+		# 미끄러지는 중: 방향 고정, 서서히 감속
+		slide_t -= delta
+		var hv := Vector2(velocity.x, velocity.z)
+		hv = hv.move_toward(Vector2.ZERO, 6.5 * delta)
+		velocity.x = hv.x
+		velocity.z = hv.y
+		if slide_t <= 0.0 or hv.length() < 3.0:
+			_end_slide()
+	else:
+		var accel := 16.0 if is_on_floor() else 4.0
+		var hcur := Vector2(velocity.x, velocity.z)
+		if (not is_on_floor() or in_jump) and hcur.length() > spd:
+			# 슬라이드 점프 등으로 빠를 때 공중에서는 속도를 천천히만 잃음
+			var keep := hcur.length() - 3.0 * delta
+			hcur = (hcur + Vector2(target.x, target.z) * delta * 3.0).limit_length(keep)
+			velocity.x = hcur.x
+			velocity.z = hcur.y
+		else:
+			velocity.x = move_toward(velocity.x, target.x, accel * spd * delta)
+			velocity.z = move_toward(velocity.z, target.z, accel * spd * delta)
 	if is_on_floor():
 		if in_jump:
 			velocity.y = JUMP_VEL
+			if slide_t > 0.0:
+				# 슬라이드 점프: 속도를 살짝 더해서 유지한 채 점프
+				velocity.x *= 1.1
+				velocity.z *= 1.1
+				_end_slide()
 			if is_player:
 				Sfx.play("jump", -10.0)
 	else:
 		velocity.y -= GRAVITY * delta
 	in_jump = false
 	move_and_slide()
+	# 자세(카메라 높이·모델 기울기)
+	_slide_k = move_toward(_slide_k, 1.0 if slide_t > 0.0 else 0.0, delta * 8.0)
+	head.position.y = lerpf(EYE, 0.95, _slide_k)
+	model.position.y = -0.12 * _slide_k
+	model.rotation.x = 0.55 * _slide_k
 
 	var hs := Vector2(velocity.x, velocity.z).length()
 	if is_on_floor() and hs > 2.0:
@@ -274,7 +333,7 @@ func _physics_process(delta: float) -> void:
 		_try_fire(pressed)
 
 	if is_player:
-		viewmodel.update_motion(delta, clampf(hs / BASE_SPEED, 0.0, 1.0), is_on_floor(), scoped)
+		viewmodel.update_motion(delta, clampf(hs / BASE_SPEED, 0.0, 1.0), is_on_floor(), scoped, _slide_k)
 		var target_fov := 80.0
 		if scoped:
 			target_fov = float(w.scope)
@@ -299,6 +358,21 @@ func snap_camera() -> void:
 	if head:
 		_eye_prev = head.global_position
 		_eye_cur = _eye_prev
+
+
+func _set_low(low: bool) -> void:
+	_col_shape.height = 1.1 if low else 1.8
+	_col_node.position.y = 0.55 if low else 0.9
+
+
+func _end_slide() -> void:
+	slide_t = 0.0
+	slide_cd = 0.45
+	_set_low(false)
+
+
+func is_sliding() -> bool:
+	return slide_t > 0.0
 
 
 func move_frac() -> float:
@@ -361,7 +435,7 @@ func _try_fire(pressed: bool) -> void:
 			var col = res.collider
 			if col is Fighter and col != self:
 				var f: Fighter = col
-				var is_head: bool = (res.position.y - f.global_position.y) > 1.47
+				var is_head: bool = (res.position.y - f.global_position.y) > (0.78 if f.is_sliding() else 1.47)
 				var dist := origin.distance_to(res.position)
 				var dmg: float = float(w.dmg) * pow(float(w.falloff), dist / 25.0)
 				if is_head:

@@ -128,7 +128,7 @@ func on_reload(t: float) -> void:
 	_reload_t = t
 
 
-func update_motion(delta: float, speed: float, on_floor: bool, scoped: bool) -> void:
+func update_motion(delta: float, speed: float, on_floor: bool, scoped: bool, slide: float = 0.0) -> void:
 	visible = not scoped
 	_bob += delta * (2.0 + speed * 9.0)
 	var bob_amt := 0.006 + speed * 0.014 * (1.0 if on_floor else 0.3)
@@ -153,6 +153,8 @@ func update_motion(delta: float, speed: float, on_floor: bool, scoped: bool) -> 
 	if not on_floor:
 		pos.y += 0.02
 	var rot := Vector3(_kick * 0.12 - _raise * 0.6, 0, 0)
+	rot.z += slide * 0.35
+	pos.x -= slide * 0.03
 	if _reload_t > 0.0:
 		_reload_t -= delta
 		var k := 1.0 - _reload_t / _reload_len

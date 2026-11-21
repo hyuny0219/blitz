@@ -100,6 +100,9 @@ func _physics_process(_delta: float) -> void:
 	if Input.is_key_pressed(KEY_SPACE) or hud.jump_tap:
 		me.in_jump = true
 	hud.jump_tap = false
+	if hud.slide_tap or Input.is_key_pressed(KEY_C) or Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_SHIFT):
+		me.in_slide = true
+	hud.slide_tap = false
 	if hud.reload_tap:
 		me.start_reload()
 		hud.reload_tap = false

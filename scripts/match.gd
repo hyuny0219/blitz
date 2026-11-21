@@ -282,8 +282,6 @@ func _process(delta: float) -> void:
 		player.head.rotation.x = player.pitch
 	if not player.alive and player.cam:
 		player.head.position.y = move_toward(player.head.position.y, 0.5, delta * 3.0)
-	elif player.alive:
-		player.head.position.y = Fighter.EYE
 	_update_score()
 
 

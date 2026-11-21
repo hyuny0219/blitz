@@ -18,6 +18,23 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	await get_tree().create_timer(0.5).timeout
 	print("[T] joystick only: yaw change=%.4f move=%s pos=%s" % [p.yaw - y0, m.hud.move_vec, p.global_position])
+	# 1-1) 달리면서 슬라이드 버튼
+	var sb: Dictionary = m.hud._btn["slide"]
+	_touch(3, sb.pos, true)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_touch(3, sb.pos, false)
+	await get_tree().create_timer(0.15).timeout
+	print("[T] slide: speed=%.1f head_y=%.2f sliding=%s" % [Vector2(p.velocity.x, p.velocity.z).length(), p.head.position.y, p.is_sliding()])
+	await get_tree().create_timer(0.3).timeout
+	_touch(4, m.hud._btn["jump"].pos, true)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_touch(4, m.hud._btn["jump"].pos, false)
+	await get_tree().create_timer(0.2).timeout
+	print("[T] slide-jump: speed=%.1f y=%.2f sliding=%s" % [Vector2(p.velocity.x, p.velocity.z).length(), p.global_position.y, p.is_sliding()])
+	await get_tree().create_timer(1.2).timeout
+	print("[T] after: speed=%.1f head_y=%.2f" % [Vector2(p.velocity.x, p.velocity.z).length(), p.head.position.y])
 	# 2) 오른쪽 드래그로 시점 돌리기 (조이스틱 누른 채)
 	y0 = p.yaw
 	_touch(1, Vector2(900, 300), true)

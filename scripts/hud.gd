@@ -15,6 +15,7 @@ var look_delta := Vector2.ZERO
 var fire_held := false
 var aim_toggle := false
 var jump_tap := false
+var slide_tap := false
 var reload_tap := false
 var _touches := {}   # index -> {role, start, pos}
 var _stick_center := Vector2.ZERO
@@ -381,6 +382,7 @@ func _layout_buttons() -> void:
 		"jump": {"pos": Vector2(s.x - 84 * u, s.y - 330 * u), "r": 50 * u, "label": "점프"},
 		"reload": {"pos": Vector2(s.x - 300 * u, s.y - 110 * u), "r": 42 * u, "label": "장전"},
 		"swap": {"pos": Vector2(s.x - 84 * u, s.y - 480 * u), "r": 40 * u, "label": "교체"},
+		"slide": {"pos": Vector2(s.x - 225 * u, s.y - 400 * u), "r": 44 * u, "label": "슬라이드"},
 	}
 
 
@@ -399,7 +401,7 @@ func _draw_touch() -> void:
 			bg = Color(0.95, 0.25, 0.2, 0.65) if held else Color(0.85, 0.2, 0.15, 0.4)
 		draw.draw_circle(b.pos, b.r, bg)
 		draw.draw_arc(b.pos, b.r, 0, TAU, 40, Color(1, 1, 1, 0.5), 3)
-		var fs := int(b.r * 0.42)
+		var fs := int(b.r * (0.32 if b.label.length() > 2 else 0.42))
 		var ts := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
 		draw.draw_string(font, b.pos + Vector2(-ts.x / 2, fs * 0.35), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(1, 1, 1, 0.95))
 	# 조이스틱
@@ -477,6 +479,8 @@ func _touch_down(idx: int, pos: Vector2) -> void:
 					aim_toggle = not aim_toggle
 				"jump":
 					jump_tap = true
+				"slide":
+					slide_tap = true
 				"reload":
 					reload_tap = true
 				"swap":

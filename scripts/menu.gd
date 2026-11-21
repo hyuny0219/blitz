@@ -499,7 +499,7 @@ func _tab_settings() -> void:
 	v.add_child(UiKit.slider_row("감도", 0.3, 3.0, Game.sensitivity, func(x): Game.sensitivity = x; Game.save()))
 	v.add_child(UiKit.slider_row("소리", 0.0, 1.0, Game.volume, func(x): Game.set_volume(x)))
 	v.add_child(UiKit.label("조작법", 24, Color(1.0, 0.8, 0.4), true))
-	v.add_child(UiKit.label("📱 폰: 왼쪽 드래그 이동 · 오른쪽 드래그 시점 · 발사/조준/점프/장전 버튼 · 아래 무기 칸 터치로 교체", 18))
-	v.add_child(UiKit.label("⌨ PC: WASD 이동 · 마우스 조준 · 좌클릭 발사 · 우클릭 조준 · Space 점프 · R 장전 · 1~4/휠 무기 · Esc 일시정지", 18))
+	v.add_child(UiKit.label("📱 폰: 왼쪽 드래그 이동 · 오른쪽 드래그 시점 · 발사/조준/점프/슬라이드/장전 버튼 · 아래 무기 칸 터치로 교체", 18))
+	v.add_child(UiKit.label("⌨ PC: WASD 이동 · 마우스 조준 · 좌클릭 발사 · 우클릭 조준 · Space 점프 · C/Shift 슬라이드 · R 장전 · 1~4/휠 무기 · Esc 일시정지", 18))
 	var st := Game.stats
 	v.add_child(UiKit.label("전적: %d승 %d패 · 처치 %d · 쓰러짐 %d" % [st.wins, st.losses, st.kills, st.deaths], 18, Color(0.8, 0.85, 0.95)))

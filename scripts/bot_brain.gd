@@ -124,6 +124,8 @@ func _physics_process(delta: float) -> void:
 			aim_head = randf() < float(diff.accuracy) * 0.6
 			if randf() < 0.12 * float(diff.strafe):
 				me.in_jump = true
+			elif randf() < 0.15 * float(diff.strafe):
+				me.in_slide = true
 		var fwd := 0.0
 		var pref := _pref_range(w)
 		if dist > pref + 4.0:
@@ -213,6 +215,8 @@ func _hunt(delta: float) -> void:
 		return
 	var local := Basis(Vector3.UP, me.yaw).inverse() * dv.normalized()
 	me.in_move = Vector2(local.x, -local.z)
+	if local.z < -0.8 and randf() < 0.004 * float(diff.strafe):
+		me.in_slide = true
 	var hs := Vector2(me.velocity.x, me.velocity.z).length()
 	if hs < 1.0:
 		stuck_t += delta

@@ -3,7 +3,7 @@ extends Node
 
 const NAMES := ["rifle", "smg", "pistol", "deagle", "sniper", "shotgun", "explosion", "hit", "headshot", "kill",
 	"beep", "go", "win", "lose", "click", "ui", "unlock", "reload", "empty", "swap", "bounce", "swing", "step",
-	"jump", "flash", "smoke", "hurt"]
+	"jump", "flash", "smoke", "hurt", "slide"]
 
 var _streams := {}
 var _pool2d: Array[AudioStreamPlayer] = []
