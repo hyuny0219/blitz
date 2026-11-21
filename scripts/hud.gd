@@ -149,6 +149,15 @@ func setup(match_node: Node, p: Fighter) -> void:
 	pause_btn.text = "II"
 	pause_btn.focus_mode = Control.FOCUS_NONE
 	pause_btn.add_theme_font_size_override("font_size", 22)
+	var psb := StyleBoxFlat.new()
+	psb.bg_color = Color(0.07, 0.09, 0.16, 0.74)
+	psb.set_corner_radius_all(4)
+	psb.skew = Vector2(0.22, 0)
+	psb.border_color = Color(1, 1, 1, 0.25)
+	psb.set_border_width_all(2)
+	psb.border_width_bottom = 4
+	for st in ["normal", "hover", "pressed"]:
+		pause_btn.add_theme_stylebox_override(st, psb)
 	pause_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	pause_btn.position = Vector2(14, 12)
 	pause_btn.size = Vector2(56, 48)
@@ -200,10 +209,16 @@ func _style_slots() -> void:
 		b.text = "%d %s" % [i + 1, w.name]
 		var sb := StyleBoxFlat.new()
 		var active := i == player.cur
-		sb.bg_color = Color(1.0, 0.62, 0.15, 0.9) if active else Color(0.08, 0.1, 0.14, 0.6)
-		sb.set_corner_radius_all(10)
-		sb.border_color = Color(1, 1, 1, 0.25)
+		sb.bg_color = Color(1.0, 0.6, 0.15, 0.95) if active else Color(0.07, 0.09, 0.16, 0.74)
+		sb.set_corner_radius_all(4)
+		sb.skew = Vector2(0.22, 0)
+		sb.border_color = Color(1.0, 0.9, 0.6, 0.9) if active else Color(1, 1, 1, 0.22)
 		sb.set_border_width_all(2)
+		sb.border_width_bottom = 4
+		if not active:
+			sb.border_color = Color(1, 1, 1, 0.22)
+		if UiKit.title_font:
+			b.add_theme_font_override("font", UiKit.title_font)
 		for st in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(st, sb)
 		b.add_theme_color_override("font_color", Color(0.05, 0.05, 0.08) if active else Color.WHITE)
@@ -405,27 +420,35 @@ func _btn_held(k: String) -> bool:
 
 func _draw_touch() -> void:
 	_layout_buttons()
-	var font := draw.get_theme_default_font()
+	var font: Font = UiKit.title_font if UiKit.title_font else draw.get_theme_default_font()
 	var a: float = Game.btn_alpha
-	var now := Time.get_ticks_msec() / 1000.0
 	for k in _btn:
 		var b: Dictionary = _btn[k]
 		var held := _btn_held(k)
 		var on: bool = held or (k == "aim" and (aim_toggle or player.scoped))
-		var r: float = b.r * (0.92 if held else 1.0)
+		var r: float = b.r * (0.93 if held else 1.0)
 		var c: Vector2 = b.pos
 		var is_fire: bool = str(k).begins_with("fire")
-		# 그림자 + 유리판 원
-		draw.draw_circle(c + Vector2(0, 4), r, Color(0, 0, 0, 0.25 * a))
-		var fill := Color(0.06, 0.08, 0.13, 0.5 * a)
+		var hexp := _hex(c, r)
+		# 그림자
+		draw.draw_colored_polygon(_hex(c + Vector2(0, 5), r), Color(0, 0, 0, 0.3 * a))
 		if is_fire:
-			fill = Color(0.92, 0.27, 0.18, (0.85 if held else 0.62) * a)
-		elif on:
-			fill = Color(1.0, 0.6, 0.15, 0.85 * a)
-		draw.draw_circle(c, r, fill)
-		draw.draw_circle(c + Vector2(0, -r * 0.35), r * 0.62, Color(1, 1, 1, 0.06 * a))
-		draw.draw_arc(c, r, 0, TAU, 48, Color(1, 1, 1, (0.75 if on or held else 0.4) * a), 2.5)
-		# 상태 링: 발사=탄약, 장전=진행도, 슬라이드=재사용 대기
+			if held:
+				draw.draw_colored_polygon(_hex(c, r + 10), Color(1.0, 0.65, 0.2, 0.25 * a))
+			# 주황→노랑 (게임 메인 색)
+			draw.draw_colored_polygon(hexp, Color(1.0, 0.55, 0.12, (0.95 if held else 0.82) * a))
+			draw.draw_colored_polygon(_hex_top(c, r), Color(1.0, 0.82, 0.3, (0.9 if held else 0.7) * a))
+			draw.draw_polyline(_closed(hexp), Color(1.0, 0.93, 0.7, 0.9 * a), 3.0)
+		else:
+			var fill := Color(1.0, 0.6, 0.15, 0.92 * a) if on else Color(0.07, 0.09, 0.16, 0.74 * a)
+			draw.draw_colored_polygon(hexp, fill)
+			draw.draw_colored_polygon(_hex_top(c, r * 0.96), Color(1, 1, 1, (0.12 if on else 0.06) * a))
+			draw.draw_polyline(_closed(hexp), Color(1, 1, 1, (0.6 if on else 0.28) * a), 2.0)
+			# 아랫변 주황 포인트
+			var p1: Vector2 = hexp[1].lerp(hexp[2], 0.2)
+			var p2: Vector2 = hexp[1].lerp(hexp[2], 0.8)
+			draw.draw_line(p1, p2, Color(1.0, 0.6, 0.15, (0.0 if on else 0.9) * a), 3.0)
+		# 상태 테두리: 발사=탄약, 장전=진행, 슬라이드=대기
 		var ring := -1.0
 		var w := player.wdata()
 		if is_fire and int(w.mag) > 0 and w.kind != "grenade":
@@ -433,42 +456,97 @@ func _draw_touch() -> void:
 		elif k == "reload" and player.reload_t > 0.0:
 			ring = 1.0 - player.reload_t / maxf(0.01, float(w.reload))
 		elif k == "slide" and (player.slide_cd > 0.0 or player.is_sliding()):
-			ring = 1.0 - player.slide_cd / 0.45 if not player.is_sliding() else 0.0
+			ring = 0.0 if player.is_sliding() else 1.0 - player.slide_cd / 0.45
 		if ring >= 0.0:
-			draw.draw_arc(c, r + 5, -PI / 2, -PI / 2 + TAU * clampf(ring, 0.0, 1.0), 48,
-				Color(1, 0.85, 0.3, 0.95 * a) if not (is_fire and ring < 0.25) else Color(1, 0.3, 0.25, a), 4)
-		# 아이콘
-		var ic := Color(1, 1, 1, 0.95 * maxf(a, 0.6))
-		if on and not is_fire:
-			ic = Color(0.08, 0.06, 0.04, 0.95)
-		_icon(b.icon, c + Vector2(0, -r * 0.1), r * 0.42, ic)
-		# 작은 글자
-		var fs := int(clampf(r * 0.24, 11, 18))
+			var rc := Color(1.0, 0.85, 0.3, 0.95 * a)
+			if is_fire and ring < 0.25:
+				rc = Color(1.0, 0.3, 0.25, a)
+			draw.draw_polyline(_hex(c, r + 7), Color(0, 0, 0, 0.35 * a), 4.0)
+			var part := _hex_partial(c, r + 7, clampf(ring, 0.0, 1.0))
+			if part.size() >= 2:
+				draw.draw_polyline(part, rc, 4.0)
+		# 아이콘 + 이름
+		var ic := Color(1, 1, 1, 0.96)
+		if on or is_fire:
+			ic = Color(0.07, 0.07, 0.12, 0.95)
+		_icon(b.icon, c + Vector2(0, -r * 0.12), r * 0.42, ic)
+		var fs := int(clampf(r * 0.25, 11, 19))
 		var ts := font.get_string_size(b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-		draw.draw_string(font, c + Vector2(-ts.x / 2, r * 0.62), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(ic.r, ic.g, ic.b, 0.85 * ic.a))
-	# 수류탄 개수 배지(교체 버튼 옆 대신 무기 칸에서 이미 표시)
-	# 조이스틱
+		draw.draw_string(font, c + Vector2(-ts.x / 2, r * 0.66), b.label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color(ic.r, ic.g, ic.b, 0.9))
+	# 조이스틱 (같은 남색 + 주황 포인트)
 	var k2 := root.size.y / 720.0 * Game.btn_scale
 	var base := _stick_center if _stick_active else Vector2(200 * root.size.y / 720.0, root.size.y - 185 * root.size.y / 720.0)
 	var br := 92 * k2
-	var ba := (1.0 if _stick_active else 0.55) * a
-	draw.draw_circle(base, br, Color(0.06, 0.08, 0.13, 0.35 * ba))
-	draw.draw_arc(base, br, 0, TAU, 56, Color(1, 1, 1, 0.35 * ba), 2.5)
+	var ba := (1.0 if _stick_active else 0.6) * a
+	draw.draw_circle(base, br, Color(0.07, 0.09, 0.16, 0.5 * ba))
+	draw.draw_arc(base, br, 0, TAU, 64, Color(1, 1, 1, 0.3 * ba), 2.0)
+	draw.draw_arc(base, br - 6 * k2, 0, TAU, 64, Color(1.0, 0.6, 0.15, 0.35 * ba), 2.0)
 	for i in 4:
 		var ang := i * PI / 2 - PI / 2
 		var dv := Vector2(cos(ang), sin(ang))
-		var tip := base + dv * (br - 14 * k2)
-		var side := Vector2(-dv.y, dv.x) * 7 * k2
-		draw.draw_colored_polygon(PackedVector2Array([tip, tip - dv * 10 * k2 + side, tip - dv * 10 * k2 - side]), Color(1, 1, 1, 0.45 * ba))
+		var tip := base + dv * (br - 16 * k2)
+		var side := Vector2(-dv.y, dv.x) * 8 * k2
+		draw.draw_polyline(PackedVector2Array([tip - dv * 9 * k2 + side, tip, tip - dv * 9 * k2 - side]), Color(1.0, 0.65, 0.2, 0.8 * ba), 3.0)
 	var knob := base + move_vec * Vector2(1, -1) * 60 * k2
-	draw.draw_circle(knob + Vector2(0, 3), 40 * k2, Color(0, 0, 0, 0.25 * ba))
-	draw.draw_circle(knob, 40 * k2, Color(1, 1, 1, 0.55 * ba))
-	draw.draw_circle(knob + Vector2(0, -10 * k2), 26 * k2, Color(1, 1, 1, 0.25 * ba))
+	draw.draw_circle(knob + Vector2(0, 4), 38 * k2, Color(0, 0, 0, 0.3 * ba))
+	draw.draw_circle(knob, 38 * k2, Color(0.95, 0.96, 1.0, 0.85 * ba))
+	draw.draw_arc(knob, 38 * k2, 0, TAU, 48, Color(1.0, 0.6, 0.15, 0.95 * ba), 4.0)
+	draw.draw_circle(knob, 12 * k2, Color(1.0, 0.6, 0.15, 0.6 * ba))
 	if not _stick_active and _hint_t > 0.0:
-		var hf := root.get_theme_default_font()
 		var hs := "여기를 눌러 이동"
-		var hsz := hf.get_string_size(hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 16)
-		draw.draw_string(hf, base + Vector2(-hsz.x / 2, -br - 12), hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1, 1, 1, 0.7 * minf(1.0, _hint_t)))
+		var hsz := font.get_string_size(hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 18)
+		draw.draw_string_outline(font, base + Vector2(-hsz.x / 2, -br - 12), hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 18, 6, Color(0, 0, 0, 0.6 * minf(1.0, _hint_t)))
+		draw.draw_string(font, base + Vector2(-hsz.x / 2, -br - 12), hs, HORIZONTAL_ALIGNMENT_CENTER, -1, 18, Color(1, 0.85, 0.4, minf(1.0, _hint_t)))
+
+
+## 평평한 위아래를 가진 육각형(뾰족한 좌우) - 로고처럼 각진 느낌
+func _hex(c: Vector2, r: float) -> PackedVector2Array:
+	var p := PackedVector2Array()
+	for i in 6:
+		var ang := deg_to_rad(60.0 * i)
+		p.append(c + Vector2(cos(ang) * r, sin(ang) * r * 0.92))
+	return p
+
+
+func _hex_top(c: Vector2, r: float) -> PackedVector2Array:
+	# 위쪽 절반 (하이라이트)
+	var h := _hex(c, r)
+	return PackedVector2Array([h[3], h[4], h[5], h[0], c + Vector2(r * 0.5, -r * 0.05), c + Vector2(-r * 0.5, -r * 0.05)])
+
+
+func _closed(p: PackedVector2Array) -> PackedVector2Array:
+	var q := p.duplicate()
+	q.append(p[0])
+	return q
+
+
+## 위쪽 꼭짓점부터 시계방향으로 frac 만큼의 테두리
+func _hex_partial(c: Vector2, r: float, frac: float) -> PackedVector2Array:
+	var h := _hex(c, r)
+	var order := [4, 5, 0, 1, 2, 3, 4]
+	var start: Vector2 = h[4].lerp(h[5], 0.5)
+	var pts := PackedVector2Array([start])
+	var total := 6.0 * frac
+	var walked := 0.5
+	var cur := start
+	var seg_i := 1
+	# 첫 반 변
+	if total <= 0.5:
+		pts.append(h[4].lerp(h[5], 0.5 + total))
+		return pts
+	pts.append(h[5])
+	var remain := total - 0.5
+	var idx := 5
+	while remain > 0.0:
+		var nxt := (idx + 1) % 6
+		if remain >= 1.0:
+			pts.append(h[nxt])
+			remain -= 1.0
+			idx = nxt
+		else:
+			pts.append(h[idx].lerp(h[nxt], remain))
+			remain = 0.0
+	return pts
 
 
 ## 단순한 선 아이콘 (s = 크기 기준)
