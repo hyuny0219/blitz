@@ -245,6 +245,8 @@ func _build_glb(path: String) -> void:
 	var aabb := _merged_aabb(inst)
 	if aabb.size.y > 0.01:
 		var s := 1.8 / aabb.size.y
+		if int(Data.character(char_id).get("body", 0)) == 2:
+			s *= 1.12   # 타이탄은 더 크게
 		inst.scale = Vector3.ONE * s
 		inst.position.y = -aabb.position.y * s
 	if _skel:

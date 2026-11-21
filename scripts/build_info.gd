@@ -1,3 +1,3 @@
 class_name BuildInfo
 extends RefCounted
-const VERSION := "1121.1152"
+const VERSION := "1121.1153"
